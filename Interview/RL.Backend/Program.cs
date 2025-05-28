@@ -23,7 +23,13 @@ builder.Services.AddCors(options =>
     options.AddPolicy(name: corsPolicy,
     policy =>
     {
-        policy.WithOrigins("http://localhost:3000").AllowAnyHeader().AllowAnyMethod();
+        policy
+            .SetIsOriginAllowed(origin =>
+            {
+                return origin.StartsWith("http://localhost");
+            })
+            .AllowAnyHeader()
+            .AllowAnyMethod();
     });
 });
 
@@ -36,7 +42,6 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = string.Empty;
 });
 
-//app.UseHttpsRedirection();
 
 app.UseCors(corsPolicy);
 
