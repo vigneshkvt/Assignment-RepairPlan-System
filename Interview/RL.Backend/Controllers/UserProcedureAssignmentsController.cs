@@ -5,7 +5,7 @@ using RL.Backend.Commands;
 using RL.Backend.Models;
 using RL.Data;
 using RL.Data.DataModels;
-using System.Data.Entity;
+using Microsoft.EntityFrameworkCore;
 
 namespace RL.Backend.Controllers
 {
@@ -27,31 +27,35 @@ namespace RL.Backend.Controllers
 
         [HttpGet("GetUsersForProcedure/{procedureId}")]
         [EnableQuery]
-        public IActionResult Get(int procedureId)
+        public async Task<IActionResult> GetUsersForProcedure(int procedureId)
         {
-            var userIDs = _context.UserProcedureAssignment
+            var userProcedureAssignments = await _context.UserProcedureAssignment
                 .Where(c => c.ProcedureId == procedureId)
-                .ToList();
+                .ToListAsync();
 
-            if (userIDs.Any())
+            if (!userProcedureAssignments.Any())
             {
-                var userIds = new List<User>();
-                foreach (var userProcedureAssignment in userIDs)
-                {
-                    var user = _context.Users
-                        .Where(c => c.UserId == userProcedureAssignment.UserId)
-                        .FirstOrDefault();
-                    if (user != null)
-                        userIds.Add(user);
-                }
-
-                return Ok(userIds);
-            }
-            else
-            {
+                // Return empty list if no assignments found
                 return Ok(Enumerable.Empty<User>());
             }
+
+            var userIds = new List<User>();
+
+            foreach (var assignment in userProcedureAssignments)
+            {
+                var user = await _context.Users
+                    .FirstOrDefaultAsync(u => u.UserId == assignment.UserId);
+
+                if (user != null)
+                {
+                    userIds.Add(user);
+                }
+            }
+
+            return Ok(userIds);
         }
+
+
         [HttpPost("AddRemoveUsersToPlan")]
         public async Task<IActionResult> AddRemoveUsersToPlan(AddUserToProducer command, CancellationToken token)
         {
@@ -61,12 +65,12 @@ namespace RL.Backend.Controllers
         }
 
         [HttpDelete("RemoveAllUser")]
-        public  IActionResult RemoveAllUser()
+        public async Task<IActionResult> RemoveAllUser()
         {
-            var planWithProcedures =  _context.Plans
+            var planWithProcedures = await _context.Plans
                                     .OrderByDescending(c => c.PlanId)
                                     .Include(c => c.PlanProcedures)
-                                    .ToList();
+                                    .ToListAsync();
 
             var planProcedure = planWithProcedures.FirstOrDefault();
 
@@ -75,11 +79,10 @@ namespace RL.Backend.Controllers
                 return BadRequest("No procedure IDs found in PlanProcedures.");
             }
 
-
-            var procedureIds =  _context.PlanProcedures
+            var procedureIds = await _context.PlanProcedures
                 .Where(c => c.PlanId == planProcedure.PlanId)
                 .Select(c => c.ProcedureId)
-                .ToList();
+                .ToListAsync();
 
             if (!procedureIds.Any())
             {
@@ -90,9 +93,9 @@ namespace RL.Backend.Controllers
                 });
             }
 
-            var assignmentsToDelete =  _context.UserProcedureAssignment
+            var assignmentsToDelete = await _context.UserProcedureAssignment
                 .Where(x => procedureIds.Contains(x.ProcedureId))
-                .ToList(); 
+                .ToListAsync();
 
             if (!assignmentsToDelete.Any())
             {
@@ -104,7 +107,7 @@ namespace RL.Backend.Controllers
             }
 
             _context.UserProcedureAssignment.RemoveRange(assignmentsToDelete);
-            _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
 
             return Ok(new
             {
