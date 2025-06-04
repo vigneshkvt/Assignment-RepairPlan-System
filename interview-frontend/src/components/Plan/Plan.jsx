@@ -19,26 +19,30 @@ const Plan = () => {
 
   useEffect(() => {
     (async () => {
-      var procedures = await getProcedures();
-      var planProcedures = await getPlanProcedures(id);
-      var users = await getUsers();
-
-      var userOptions = [];
-      users.map((u) => userOptions.push({ label: u.name, value: u.userId }));
-
-      setUsers(userOptions);
-      setProcedures(procedures);
-      setPlanProcedures(planProcedures);
+      try {
+        const procedures = await getProcedures();
+        const planProcedures = await getPlanProcedures(id);
+        const users = await getUsers();
+  
+        const userOptions = users.map((u) => ({ label: u.name, value: u.userId }));
+  
+        setUsers(userOptions);
+        setProcedures(procedures);
+        setPlanProcedures(planProcedures);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        alert("An error occurred while fetching data. Please try again later.");
+      }
     })();
   }, [id]);
 
   const handleAddProcedureToPlan = async (procedure) => {
     const hasProcedureInPlan = planProcedures.some((p) => p.procedureId === procedure.procedureId);
     if (hasProcedureInPlan) return;
-
-    await addProcedureToPlan(id, procedure.procedureId);
-    setPlanProcedures((prevState) => {
-      return [
+  
+    try {
+      await addProcedureToPlan(id, procedure.procedureId);
+      setPlanProcedures((prevState) => [
         ...prevState,
         {
           planId: id,
@@ -48,17 +52,25 @@ const Plan = () => {
             procedureTitle: procedure.procedureTitle,
           },
         },
-      ];
-    });
+      ]);
+    } catch (error) {
+      console.error("Error adding procedure to plan:", error);
+      alert("An error occurred while adding the procedure to the plan. Please try again.");
+    }
   };
 
-    const removeAllUsers = async () => {
-       const result = await RemoveAllUsersForSelectedProcedure();
-       if(result && result.deletedCount > 0){
-          window.location.reload();
-       }
-       alert(`${result.message}`);
+  const removeAllUsers = async () => {
+    try {
+      const result = await RemoveAllUsersForSelectedProcedure();
+      if (result && result.deletedCount > 0) {
+        window.location.reload();
+      }
+      alert(`${result.message}`);
+    } catch (error) {
+      console.error("Error removing all users:", error);
+      alert("An error occurred while removing all users. Please try again.");
     }
+  };
 
   return (
     <Layout>

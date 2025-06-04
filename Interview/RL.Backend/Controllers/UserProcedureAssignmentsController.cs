@@ -27,28 +27,31 @@ namespace RL.Backend.Controllers
 
         [HttpGet("GetUsersForProcedure/{procedureId}")]
         [EnableQuery]
-        public IEnumerable<User> Get(int procedureId)
+        public IActionResult Get(int procedureId)
         {
-            var userIDs = _context.UserProcedureAssignment.Where(c => c.ProcedureId == procedureId);
+            var userIDs = _context.UserProcedureAssignment
+                .Where(c => c.ProcedureId == procedureId)
+                .ToList();
 
             if (userIDs.Any())
             {
                 var userIds = new List<User>();
-                foreach (var userProcedureAssignment in userIDs.ToList())
+                foreach (var userProcedureAssignment in userIDs)
                 {
-                    var userid = _context.Users.Where(c => c.UserId == userProcedureAssignment.UserId).ToList().FirstOrDefault();
-                    if (userid != null)
-                        userIds.Add(userid);
+                    var user = _context.Users
+                        .Where(c => c.UserId == userProcedureAssignment.UserId)
+                        .FirstOrDefault();
+                    if (user != null)
+                        userIds.Add(user);
                 }
 
-                return userIds.ToList();
+                return Ok(userIds);
             }
             else
             {
-                return Enumerable.Empty<User>();
+                return Ok(Enumerable.Empty<User>());
             }
         }
-
         [HttpPost("AddRemoveUsersToPlan")]
         public async Task<IActionResult> AddRemoveUsersToPlan(AddUserToProducer command, CancellationToken token)
         {
@@ -58,45 +61,56 @@ namespace RL.Backend.Controllers
         }
 
         [HttpDelete("RemoveAllUser")]
-        public async Task<IActionResult> RemoveAllUser()
+        public  IActionResult RemoveAllUser()
         {
-            var planProcedure = _context.Plans.OrderByDescending(c => c.PlanId).Include(c => c.PlanProcedures).FirstOrDefault();
-            List<int> procedureIds = new List<int>();
+            var planWithProcedures =  _context.Plans
+                                    .OrderByDescending(c => c.PlanId)
+                                    .Include(c => c.PlanProcedures)
+                                    .ToList();
 
-            if (planProcedure != null)
+            var planProcedure = planWithProcedures.FirstOrDefault();
+
+            if (planProcedure == null)
             {
-                procedureIds = _context.PlanProcedures
-                    .Where(c => c.PlanId == planProcedure.PlanId)
-                    .Select(c => c.ProcedureId)
-                    .ToList();
+                return BadRequest("No procedure IDs found in PlanProcedures.");
             }
 
-            if (procedureIds.Any())
+
+            var procedureIds =  _context.PlanProcedures
+                .Where(c => c.PlanId == planProcedure.PlanId)
+                .Select(c => c.ProcedureId)
+                .ToList();
+
+            if (!procedureIds.Any())
             {
-                var assignmentsToDelete = _context.UserProcedureAssignment
-                    .Where(x => procedureIds.Contains(x.ProcedureId))
-                    .ToList();
-
-                if (assignmentsToDelete.Any())
-                {
-                    _context.UserProcedureAssignment.RemoveRange(assignmentsToDelete);
-                    await _context.SaveChangesAsync();
-
-                    return Ok(new
-                    {
-                        Message = "Users removed successfully.",
-                        DeletedCount = assignmentsToDelete.Count
-                    });
-                }
-
                 return Ok(new
                 {
                     Message = "No Users Selected",
-                    DeletedCount = assignmentsToDelete.Count
+                    DeletedCount = 0
                 });
             }
 
-            return BadRequest("No procedure IDs found in PlanProcedures.");
+            var assignmentsToDelete =  _context.UserProcedureAssignment
+                .Where(x => procedureIds.Contains(x.ProcedureId))
+                .ToList(); 
+
+            if (!assignmentsToDelete.Any())
+            {
+                return Ok(new
+                {
+                    Message = "No Users Selected",
+                    DeletedCount = 0
+                });
+            }
+
+            _context.UserProcedureAssignment.RemoveRange(assignmentsToDelete);
+            _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                Message = "Users removed successfully.",
+                DeletedCount = assignmentsToDelete.Count
+            });
         }
     }
 }

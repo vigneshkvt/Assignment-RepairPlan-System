@@ -2,8 +2,12 @@ using System.Text.Json;
 using Microsoft.AspNetCore.OData;
 using RL.Data;
 using MediatR;
+using FluentValidation;
+using RL.Backend.Validators;
+using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
 
 // Add services to the container.
 builder.Services.AddMediatR(typeof(Program));
@@ -13,6 +17,12 @@ builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddFluentValidationClientsideAdapters(); // Enable FluentValidation integration
+
+builder.Services.AddValidatorsFromAssemblyContaining<AddUserToProducerValidator>(); // Register all validators
+
 builder.Services.AddSwaggerGen(c =>
 {
     c.OperationFilter<EnableQueryFiler>();
